@@ -1,0 +1,561 @@
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <title>
+      Visualize data with class breaks | Sample | ArcGIS Maps SDK for JavaScript
+      4.27
+    </title>
+
+    <link
+      rel="stylesheet"
+      href="https://js.arcgis.com/4.27/esri/themes/light/main.css"
+    />
+    <script src="https://js.arcgis.com/4.27/"></script>
+
+    <style>
+      html,
+      body,
+      #viewDiv {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+      }
+      #layerToggle {
+        bottom: 20px;
+        left: 10px;
+        position: absolute;
+        z-index: 99;
+        background-color: white;
+        border-radius: 8px;
+        padding: 10px;
+        opacity: 0.75;
+      }
+      #optionsDiv {
+        background-color: white;
+        color: black;
+        padding: 6px;
+        max-width: 400px;
+        display: none;
+      }
+      #buttonsDiv {
+        top: 12px;
+        right: 12px;
+        padding: 12px;
+        background-color: rgba(200, 200, 200, 0.5);
+        border: 1px solid black;
+      }
+
+      #indicatorSpan {
+        display: inline-block;
+        vertical-align: middle;
+        width: 30px;
+        height: 30px;
+        background-color: rgba(100, 100, 100, 0.8);
+        border: 2px solid #ccc;
+      }
+    </style>
+
+    <script>
+      require([
+        "esri/Map",
+        "esri/Graphic",
+        "esri/views/SceneView",
+        "esri/geometry/Polyline",
+        "esri/layers/ElevationLayer",
+        "esri/layers/FeatureLayer",
+        "esri/core/promiseUtils",
+        "esri/widgets/Daylight",
+        "esri/widgets/Expand",
+        "esri/widgets/Legend",
+      ], (
+        Map,
+        Graphic, 
+        SceneView, 
+        Polyline, 
+        ElevationLayer, 
+        FeatureLayer, 
+        promiseUtils, 
+        Daylight, 
+        Expand, 
+        Legend,) => {
+        /*****************************************************************
+         * Symbols for each class break.
+         *****************************************************************/
+
+        const less25 = {
+          type: "simple-fill", // autocasts as new SimpleFillSymbol()
+          color: "#fffcd4",
+          style: "solid",
+          outline: {
+            width: 0.2,
+            color: [255, 255, 255, 0.5]
+          }
+        };
+
+        const less50 = {
+          type: "simple-fill", // autocasts as new SimpleFillSymbol()
+          color: "#b1cdc2",
+          style: "solid",
+          outline: {
+            width: 0.2,
+            color: [255, 255, 255, 0.5]
+          }
+        };
+
+        const more50 = {
+          type: "simple-fill", // autocasts as new SimpleFillSymbol()
+          color: "#38627a",
+          style: "solid",
+          outline: {
+            width: 0.2,
+            color: [255, 255, 255, 0.5]
+          }
+        };
+
+        const more75 = {
+          type: "simple-fill", // autocasts as new SimpleFillSymbol()
+          color: "#0d2644",
+          style: "solid",
+          outline: {
+            width: 0.2,
+            color: [255, 255, 255, 0.5]
+          }
+        };
+
+        /*****************************************************************
+         * Renderer for feature layer map and the map itself
+         *****************************************************************/
+
+        const renderer = {
+          type: "class-breaks", // autocasts as new ClassBreaksRenderer()
+          field: "EDUC_H_all",
+          normalizationField: "POP",
+          legendOptions: {
+            title: "% žmonių (+10 metų) turinčių aukštąjį išsilavinimą"
+          },
+          //default for no-data field is redundant because of definitionExpression in the FeatureLayer below
+          classBreakInfos: [
+            {
+              minValue: 0,
+              maxValue: 0.2499,
+              symbol: less25,
+              label: "< 25%"
+            },
+            {
+              minValue: 0.25,
+              maxValue: 0.4999,
+              symbol: less50,
+              label: "25 - 50%"
+            },
+            {
+              minValue: 0.5,
+              maxValue: 0.7499,
+              symbol: more50,
+              label: "50 - 75%"
+            },
+            {
+              minValue: 0.75,
+              maxValue: 1.0,
+              symbol: more75,
+              label: "> 75%"
+            }
+          ]
+        };
+
+        const eduLayer = new FeatureLayer({
+          url: "https://services3.arcgis.com/MF53hRPmwfLccHCj/arcgis/rest/services/grid100/FeatureServer",
+          title: "Aukštasis išsilavinimas didžiuosiuose Lietuvos miestuose",
+          renderer: renderer,
+          popupTemplate: {
+            // autocast as esri/PopupTemplate
+            title: "Gardelės kodas {GRID_ID}",
+            content:
+              "Bloke gyvena {POP} žmonių. Iš jų {EDUC_H_all} turi aukštąjį išsilavinimą."
+          },
+          definitionExpression: "POP >= 10",
+          visible: false
+        });
+        
+        const elevationLayer = new ElevationLayer({
+          url: "https://tiles-eu1.arcgis.com/hNlcwtF0DbSv2bcF/arcgis/rest/services/Elevation_V2/ImageServer"
+        });
+
+        const map = new Map({
+          basemap: "topo-vector",
+          layers: [eduLayer],
+          ground: {
+            layers: [elevationLayer]
+          }
+        });
+
+        const view = new SceneView({
+          container: "viewDiv",
+          map: map,
+          center: [25.279652, 54.687157],
+          zoom: 12,
+          popup: {
+            dockEnabled: true,
+            dockOptions: {
+              buttonEnabled: false,
+              breakpoint: false,
+              position: "bottom-left",
+            }
+          },
+          qualityProfile: "high",
+          environment: {
+            lighting: {
+              // autocasts as new SunLighting()
+              type: "sun",
+              date: new Date("October 25, 2023 16:20:00 UTC+2"),
+
+              directShadowsEnabled: true
+            }
+          }
+        });
+        
+        /*****************************************************************
+         * Custom CSS for the popup template
+         * Legend
+         *****************************************************************/
+        
+        const customPopupStyle = document.createElement("style");
+        customPopupStyle.textContent = `
+          .esri-popup__main-container {
+            bottom: 45px;
+            left: 0;
+          }
+        `;
+        document.head.appendChild(customPopupStyle);
+
+        const legend = new Legend({
+          view: view,
+          visible: false,
+        });
+
+        /*****************************************************************
+         * legend and feature map toggles
+         *****************************************************************/
+
+        const eduLayerToggle = document.getElementById("EduLayer");
+        const legendToggle = document.getElementById("Legend");
+
+        eduLayerToggle.addEventListener("change", () => {
+          eduLayer.visible = eduLayerToggle.checked;
+        });
+
+        legendToggle.addEventListener("change", () => {
+          legend.visible = legendToggle.checked;
+        });
+
+        /*****************************************************************
+         * UI elements for query, legend and feature map
+         *****************************************************************/
+
+        const queryToggle = document.getElementById("queryToggleBtn");
+        const queryContent = document.getElementById("optionsDiv");
+        
+        let contentVisible = false;
+        
+        queryToggle.addEventListener('click', () => {
+            if (contentVisible) {
+                // If content is visible, hide it
+                queryContent.style.display = 'none';
+                contentVisible = false;
+            } else {
+                // If content is hidden, show it
+                queryContent.style.display = 'block';
+                contentVisible = true;
+            }
+        });
+
+        /*****************************************************************
+         * Query
+         *****************************************************************/
+
+        // additional query fields initially set to null for basic query
+        let distance = null;
+        let units = null;
+
+        //create graphic for mouse point click
+        const pointGraphic = new Graphic({
+          symbol: {
+            type: "simple-marker", // autocasts as new SimpleMarkerSymbol()
+            color: [0, 0, 139],
+            outline: {
+              color: [255, 255, 255],
+              width: 1.5
+            }
+          }
+        });
+
+        // Create graphic for distance buffer
+        const bufferGraphic = new Graphic({
+          symbol: {
+            type: "simple-fill", // autocasts as new SimpleFillSymbol()
+            color: [173, 216, 230, 0.2],
+            outline: {
+              // autocasts as new SimpleLineSymbol()
+              color: [255, 255, 255],
+              width: 1
+            }
+          }
+        });
+
+        // when query type changes, set appropriate values
+        const queryOpts = document.getElementById("query-type");
+
+        queryOpts.addEventListener("change", () => {
+          switch (queryOpts.value) {
+            // values set for distance query
+            case "distance":
+              distance = 300;
+              units = "meters";
+              break;
+            default:
+              // Default set to basic query
+              distance = null;
+              units = null;
+          }
+        });
+
+        view.on("click", (event) => {
+          view.graphics.remove(pointGraphic);
+          if (view.graphics.includes(bufferGraphic)) {
+            view.graphics.remove(bufferGraphic);
+          }
+          queryFeatures(event);
+        });
+
+        function queryFeatures(screenPoint) {
+          const point = view.toMap(screenPoint);
+          eduLayer
+            .queryFeatures({
+              geometry: point,
+              // distance and units will be null if basic query selected
+              distance: distance,
+              units: units,
+              spatialRelationship: "intersects",
+              returnGeometry: false,
+              returnQueryGeometry: true,
+              outFields: ["*"]
+            })
+            .then((featureSet) => {
+              point.hasZ = false;
+              point.z = undefined;
+              // set graphic location to mouse pointer and add to sceneview
+              pointGraphic.geometry = point;
+              view.graphics.add(pointGraphic);
+              // open popup of query result
+              view.openPopup({
+                features: featureSet.features,
+                featureMenuOpen: true
+              });
+              if (featureSet.queryGeometry) {
+                bufferGraphic.geometry = featureSet.queryGeometry;
+                view.graphics.add(bufferGraphic);
+              }
+            });
+        }
+        
+        /*****************************************************************
+         * Analysis element
+         *****************************************************************/
+         
+         // Initialize symbols
+        const textSymbol = {
+          type: "point-3d", // autocasts as new PointSymbol3D()
+          verticalOffset: {
+            screenLength: 10 // Offset the text to be above the line
+          },
+          symbolLayers: [
+            {
+              type: "text", // autocasts as new TextSymbol3DLayer()
+              material: { color: "black" },
+              size: 12,
+              background: { color: [255, 255, 255, 0.75] },
+              verticalAlignment: "bottom" // Aligns the text's bottom to be above the input position
+            }
+          ]
+        };
+        
+        view.on("click", (event) => {
+          // Query elevation using the afterLandslideLayer at the clicked map position
+          const elevationPosition = event.mapPoint;
+          const elevationQuery = elevationLayer.queryElevation(elevationPosition);
+
+          // When the query promise resolves, execute the following code
+          elevationQuery
+            .then((result) => {
+              const posElevation = result.geometry;
+
+              // Clear graphics from previous result (if applicable)
+              view.graphics.removeAll();
+
+              // Display the elevation
+              textSymbol.symbolLayers[0].text = posElevation.z.toFixed(2) + " m";
+              view.graphics.add(
+                new Graphic({
+                  geometry: posElevation,
+                  symbol: textSymbol
+                })
+              );
+            })
+            .catch((error) => {
+              textSymbol.symbolLayers[0].text =
+                "Elevation query failed (" + error.message + ")";
+            });
+        });
+         
+         /*****************************************************************
+         * Environment widget
+         *****************************************************************/
+         
+         // Create the daylight widget
+        const daylight = new Daylight({
+            view: view,
+            // plays the animation twice as fast than the default one
+            playSpeedMultiplier: 2,
+            // disable the timezone selection button
+            visibleElements: {
+              timezone: false
+          }
+        });
+
+        // Create an expandable widget for the daylight widget
+        const expand = new Expand({
+            content: daylight,
+            view: view,
+            expanded: false,
+            group: "top-right"
+        });
+         
+         /*****************************************************************
+         * Camera control
+         *****************************************************************/
+         
+         // Register events to control
+        const rotateAntiClockwiseSpan = document.getElementById(
+          "rotateAntiClockwiseSpan"
+        );
+        const rotateClockwiseSpan = document.getElementById(
+          "rotateClockwiseSpan"
+        );
+        const indicatorSpan = document.getElementById("indicatorSpan");
+        rotateClockwiseSpan.addEventListener("click", () => {
+          rotateView(-1);
+        });
+        rotateAntiClockwiseSpan.addEventListener("click", () => {
+          rotateView(1);
+        });
+        indicatorSpan.addEventListener("click", tiltView);
+
+        // Watch the change on view.camera
+        view.watch("camera", updateIndicator);
+
+        // Create the event's callback functions
+        function rotateView(direction) {
+          let heading = view.camera.heading;
+
+          // Set the heading of the view to the closest multiple of 90 degrees,
+          // depending on the direction of rotation
+          if (direction > 0) {
+            heading = Math.floor((heading + 1e-3) / 90) * 90 + 90;
+          } else {
+            heading = Math.ceil((heading - 1e-3) / 90) * 90 - 90;
+          }
+
+          view
+            .goTo({
+              heading: heading
+            })
+            .catch((error) => {
+              if (error.name != "AbortError") {
+                console.error(error);
+              }
+            });
+        }
+
+        function tiltView() {
+          // Get the camera tilt and add a small number for numerical inaccuracies
+          let tilt = view.camera.tilt + 1e-3;
+
+          // Switch between 3 levels of tilt
+          if (tilt >= 80) {
+            tilt = 0;
+          } else if (tilt >= 40) {
+            tilt = 80;
+          } else {
+            tilt = 40;
+          }
+
+          view
+            .goTo({
+              tilt: tilt
+            })
+            .catch((error) => {
+              if (error.name != "AbortError") {
+                console.error(error);
+              }
+            });
+        }
+
+        function updateIndicator(camera) {
+          let tilt = camera.tilt;
+          let heading = camera.heading;
+
+          // Update the indicator to reflect the current tilt/heading using
+          // css transforms.
+
+          const transform = `rotateX(${
+            0.8 * tilt
+          }deg) rotateY(0) rotateZ(${-heading}deg)`;
+          indicatorSpan.style["transform"] = transform;
+          indicatorSpan.style["-webkit-transform"] = transform; // Solution for Safari
+        }
+        
+        /*****************************************************************
+         * UI element order
+         *****************************************************************/
+         
+        view.ui.add("buttonsDiv", "top-right");
+        view.ui.add(legend, "bottom-right");
+        view.ui.add(queryToggle, "top-right");
+        view.ui.add(queryContent, "top-right");
+        view.ui.add(expand, "top-left");
+      });
+    </script>
+  </head>
+
+  <body>
+    <div id="viewDiv"></div>
+    
+    <div>
+      <span id="layerToggle" class="esri-widget">
+        <input type="checkbox" id="EduLayer" /> Išsilavinimas
+        <input type="checkbox" id="Legend" /> Legenda
+      </span>
+    </div>
+    
+    <button id="queryToggleBtn">Užklausos tipas</button>
+    <div id="optionsDiv" class="esri-widget">
+      <p>
+        Pasirinkite užklausos tipą ir paspauskite ant žemėlapio, jog galėtumete peržiūrėti rezultatus.
+      </p>
+      <select id="query-type" class="esri-widget">
+        <option value="basic">Taškinė užklausa</option>
+        <option value="distance">Užklausa pagal atstumą</option>
+      </select>
+    </div>
+    
+    <div id="buttonsDiv">
+      <button id="rotateAntiClockwiseSpan" title="Rotate 90°">↻</button>
+      <button id="indicatorSpan"></button>
+      <button id="rotateClockwiseSpan" title="Rotate 90°">↺</button>
+    </div>
+  </body>
+</html>
