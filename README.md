@@ -1,1 +1,1 @@
-# ArcGIS_Playground
+Various simple ArcGIS Sandbox projects
